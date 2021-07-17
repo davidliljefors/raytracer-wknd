@@ -1,7 +1,6 @@
 use std::ops::*;
 
 #[allow(dead_code)]
-
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Vec3 {
     pub x: f32,
@@ -15,16 +14,16 @@ pub struct Ray {
     pub dir: Vec3,
 }
 
-pub fn lerp(a: Vec3, b: Vec3, t:f32) -> Vec3 {   
-    a * (1.0-t) + b * t
+pub fn lerp(a: Vec3, b: Vec3, t: f32) -> Vec3 {
+    a * (1.0 - t) + b * t
 }
 
 impl Ray {
-    pub fn new(origin:Vec3, dir:Vec3) -> Ray {
-        Ray{ origin, dir }
+    pub fn new(origin: Vec3, dir: Vec3) -> Ray {
+        Ray { origin, dir }
     }
 
-    pub fn at(&self, t:f32) -> Vec3 {
+    pub fn at(&self, t: f32) -> Vec3 {
         self.origin + self.dir * t
     }
 }
@@ -34,12 +33,16 @@ impl Vec3 {
         Vec3 { x, y, z }
     }
 
-    pub fn from_scalar(scalar:f32) -> Vec3 {
+    pub fn from_scalar(scalar: f32) -> Vec3 {
         Vec3::new(scalar, scalar, scalar)
     }
 
     pub fn zero() -> Vec3 {
-        Vec3{ x:0.0, y:0.0, z:0.0 }
+        Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }
     }
 
     pub fn dot(self: Vec3, rhs: Vec3) -> f32 {
@@ -110,6 +113,13 @@ impl Sub for Vec3 {
 impl SubAssign for Vec3 {
     fn sub_assign(&mut self, rhs: Self) {
         *self = *self - rhs;
+    }
+}
+
+impl Neg for Vec3 {
+    type Output = Vec3;
+    fn neg(self) -> Self::Output {
+        Vec3::new(-self.x, -self.y, -self.z)
     }
 }
 
