@@ -5,6 +5,7 @@ use crate::helpers::ray_color;
 mod color;
 mod helpers;
 mod maths;
+mod hittable;
 
 fn main() {
     let filename = std::ffi::CString::new("image.bmp").unwrap();
