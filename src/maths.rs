@@ -2,7 +2,6 @@ use std::ops::*;
 
 use rand::Rng;
 
-#[allow(dead_code)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Vec3 {
     pub x: f32,
@@ -72,6 +71,10 @@ impl Vec3 {
                 return test
             }
         }   
+    }
+
+    pub fn reflect(self, normal:Vec3) -> Vec3 {
+        self - normal * 2.0 * Vec3::dot(self, normal)
     }
 
     pub fn random_unit_vector() -> Vec3 {
@@ -162,6 +165,18 @@ impl Neg for Vec3 {
     type Output = Vec3;
     fn neg(self) -> Self::Output {
         Vec3::new(-self.x, -self.y, -self.z)
+    }
+}
+
+impl Mul for Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, rhs: Vec3) -> Vec3 {
+        Vec3 {
+            x: self.x * rhs.x,
+            y: self.y * rhs.y,
+            z: self.z * rhs.z,
+        }
     }
 }
 

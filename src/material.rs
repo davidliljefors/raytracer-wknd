@@ -29,3 +29,26 @@ impl Material for Lambertian {
         Some((self.albedo, scattered))
     }
 }
+
+pub struct Metal {
+    albedo: Color,
+}
+
+impl Metal {
+    pub fn create(albedo: Color) -> MaterialPtr {
+        std::rc::Rc::new(Metal { albedo })
+    }
+}
+
+impl Material for Metal {
+    fn scatter(&self, ray: Ray, hit: HitRecord) -> Option<(Color, Ray)> {
+        let reflected = Vec3::reflect(ray.dir.normalized(), hit.normal);
+
+        let scattered = Ray::new(hit.point, reflected);
+        if Vec3::dot(scattered.dir, hit.normal) > 0.0 {
+            return Some((self.albedo, scattered));
+        }
+        
+        None
+    }
+}

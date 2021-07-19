@@ -28,7 +28,9 @@ fn main() {
     let mut world = HittableList::new();
     //let sphere = hittable::Sphere::new(0.0, 0.0, -1.0, 0.5);
     let center_mat = material::Lambertian::create(Color{r:0.8, g:0.6, b:0.0});
+    let left_mat = material::Metal::create(Color{r:0.8, g:0.8, b:0.8});
     let ground_mat = material::Lambertian::create(Color{r:0.2, g:0.8, b:0.3});
+    world.add(Box::new(hittable::Sphere::new(-1.0, 0.0, -1.0, 0.5, left_mat)));
     world.add(Box::new(hittable::Sphere::new(0.0, 0.0, -1.0, 0.5, center_mat)));
     world.add(Box::new(hittable::Sphere::new(0.0, -100.5, -1.0, 100.0, ground_mat)));
 
