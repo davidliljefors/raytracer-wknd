@@ -18,9 +18,12 @@ pub fn ray_color<T: Hittable>(ray: Ray, world: &T, depth:i32) -> color::Color {
     }
 
     if let Some(hit) = world.hit(0.01, f32::INFINITY, &ray) {
-        let target = hit.point + hit.normal + Vec3::random_in_hemisphere(hit.normal);
-        let ray = Ray::new(hit.point, target - hit.point);
-        return ray_color(ray, world, depth - 1) * 0.5;
+        let mat = hit.material.clone();
+        if let Some((attenuation, scattered)) = mat.scatter(ray, hit) {
+            return ray_color(scattered, world, depth - 1) * attenuation;
+        }
+
+        return color::BLACK;
     }
 
     let unit_dir = ray.dir;

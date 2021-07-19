@@ -1,8 +1,9 @@
+#![allow(dead_code)]
 use core::f32;
 
 use crate::helpers::{random_float, ray_color};
 use crate::hittable::HittableList;
-use crate::maths::Vec3;
+use crate::color::Color;
 
 mod camera;
 mod material;
@@ -26,8 +27,10 @@ fn main() {
     // World
     let mut world = HittableList::new();
     //let sphere = hittable::Sphere::new(0.0, 0.0, -1.0, 0.5);
-    world.add(Box::new(hittable::Sphere::new(0.0, 0.0, -1.0, 0.5)));
-    world.add(Box::new(hittable::Sphere::new(0.0, -100.5, -1.0, 100.0)));
+    let center_mat = material::Lambertian::create(Color{r:0.8, g:0.6, b:0.0});
+    let ground_mat = material::Lambertian::create(Color{r:0.2, g:0.8, b:0.3});
+    world.add(Box::new(hittable::Sphere::new(0.0, 0.0, -1.0, 0.5, center_mat)));
+    world.add(Box::new(hittable::Sphere::new(0.0, -100.5, -1.0, 100.0, ground_mat)));
 
     for y in (0..height).rev() {
         print!("\x1B[2J\x1B[1;1H"); // Clear and reset console print
