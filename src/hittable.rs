@@ -1,5 +1,5 @@
-use crate::maths::Vec3;
 use crate::maths::Ray;
+use crate::maths::Vec3;
 
 pub struct HitRecord {
     pub point: Vec3,
@@ -33,6 +33,15 @@ pub struct Sphere {
     pub radius: f32,
 }
 
+impl Sphere {
+    pub fn new(x: f32, y: f32, z: f32, radius: f32) -> Sphere {
+        Sphere {
+            center: Vec3 { x, y, z },
+            radius,
+        }
+    }
+}
+
 impl Hittable for Sphere {
     fn hit(&self, tmin: f32, tmax: f32, ray: &Ray) -> Option<HitRecord> {
         let oc = ray.origin - self.center;
@@ -54,8 +63,38 @@ impl Hittable for Sphere {
         }
 
         let point = ray.at(root);
-        let outward_normal = point - self.center / self.radius;
+        let outward_normal = (point - self.center) / self.radius;
 
         Some(HitRecord::create(ray, root, outward_normal))
+    }
+}
+
+pub struct HittableList {
+    objects: Vec<Box<dyn Hittable>>,
+}
+
+impl HittableList {
+    pub fn new() -> HittableList {
+        HittableList {
+            objects: Vec::<Box<dyn Hittable>>::new(),
+        }
+    }
+
+    pub fn add(&mut self, hittable: Box<dyn Hittable>) {
+        self.objects.push(hittable);
+    }
+}
+
+impl Hittable for HittableList {
+    fn hit(&self, tmin: f32, tmax: f32, ray: &Ray) -> Option<HitRecord> {
+        let mut closest_distance = tmax;
+        let mut temphit = None;
+        for hittable in self.objects.as_slice() {
+            if let Some(hit) = hittable.hit(tmin, closest_distance, ray) {
+                closest_distance = hit.t;
+                temphit = Some(hit);
+            }
+        }
+        temphit
     }
 }

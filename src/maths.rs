@@ -1,5 +1,7 @@
 use std::ops::*;
 
+use rand::Rng;
+
 #[allow(dead_code)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Vec3 {
@@ -28,6 +30,16 @@ impl Ray {
     }
 }
 
+pub fn clamp<T: PartialOrd>(min:T, max:T, val:T ) -> T {
+    if val < min {
+        return min;
+    }
+    if val > max {
+        return max;
+    }
+    val
+} 
+
 impl Vec3 {
     pub fn new(x: f32, y: f32, z: f32) -> Vec3 {
         Vec3 { x, y, z }
@@ -43,6 +55,36 @@ impl Vec3 {
             y: 0.0,
             z: 0.0,
         }
+    }
+
+    pub fn inside_unit_sphere() -> Vec3 {
+        let random_vector = || {
+            let mut rng = rand::thread_rng();
+            let x = rng.gen_range(-1.0..1.0);
+            let y = rng.gen_range(-1.0..1.0);
+            let z = rng.gen_range(-1.0..1.0);
+            Vec3{x,y,z}
+        };
+
+        loop {
+            let test = random_vector();
+            if test.length2() < 1.0 {
+                return test
+            }
+        }   
+    }
+
+    pub fn random_unit_vector() -> Vec3 {
+        Vec3::inside_unit_sphere().normalized()
+    }
+
+    pub fn random_in_hemisphere(normal:Vec3) -> Vec3 {
+        let in_unit_sphere = Vec3::inside_unit_sphere();
+        if Vec3::dot(in_unit_sphere, normal) < 0.0 {
+            return -in_unit_sphere;
+        }
+
+        in_unit_sphere
     }
 
     pub fn dot(self: Vec3, rhs: Vec3) -> f32 {

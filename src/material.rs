@@ -1,0 +1,5 @@
+
+
+trait Material {
+    fn scatter()
+}
