@@ -1,9 +1,14 @@
+use std::rc::Rc;
+
 use crate::maths::Ray;
 use crate::maths::Vec3;
+use crate::material::{MaterialPtr};
 
+pub type HittablePtr = Box<dyn Hittable>;
 pub struct HitRecord {
     pub point: Vec3,
     pub normal: Vec3,
+    //pub material: MaterialPtr,
     pub t: f32,
     pub front_face: bool,
 }
@@ -70,17 +75,17 @@ impl Hittable for Sphere {
 }
 
 pub struct HittableList {
-    objects: Vec<Box<dyn Hittable>>,
+    objects: Vec<HittablePtr>,
 }
 
 impl HittableList {
     pub fn new() -> HittableList {
         HittableList {
-            objects: Vec::<Box<dyn Hittable>>::new(),
+            objects: Vec::<HittablePtr>::new(),
         }
     }
 
-    pub fn add(&mut self, hittable: Box<dyn Hittable>) {
+    pub fn add(&mut self, hittable: HittablePtr) {
         self.objects.push(hittable);
     }
 }

@@ -5,6 +5,7 @@ use crate::hittable::HittableList;
 use crate::maths::Vec3;
 
 mod camera;
+mod material;
 mod color;
 mod helpers;
 mod hittable;
@@ -16,7 +17,7 @@ fn main() {
 
     let camera = camera::Camera::create();
 
-    let samples_per_pixel = 100;
+    let samples_per_pixel = 200;
     let depth = 50;
     let width = 720;
     let height = (width as f32 / camera.aspect()) as i32;
@@ -36,7 +37,7 @@ fn main() {
             ((height - y) as f64 / height as f64) * 100.0
         );
         for x in 0..width {
-            let mut accum_color = Vec3::zero();
+            let mut accum_color = color::BLACK;
             for _ in 0..samples_per_pixel {
                 let ru = random_float(0.0..1.0);
                 let rv = random_float(0.0..1.0);
@@ -44,7 +45,7 @@ fn main() {
                 let u = (x as f32 + ru) / (width as f32 - 1.0);
                 accum_color += ray_color(camera.get_ray(u, v), &world, depth);
             }
-            let accum_color = accum_color.as_color(samples_per_pixel);
+            let accum_color = accum_color.as_rgb8(samples_per_pixel);
             image.push(accum_color.r);
             image.push(accum_color.g);
             image.push(accum_color.b);
