@@ -77,6 +77,14 @@ impl Vec3 {
         self - normal * 2.0 * Vec3::dot(self, normal)
     }
 
+    pub fn refract(self, normal:Vec3, etai_over_etat:f32) -> Vec3 {
+        let cos_theta = f32::min(Vec3::dot(-self, normal), 1.0);
+        let r_out_perp =  (self + normal * cos_theta) * etai_over_etat;
+        let r_out_parallel = normal * -f32::sqrt(f32::abs(1.0 - r_out_perp.length2()));
+        
+        r_out_perp + r_out_parallel
+    }
+
     pub fn random_unit_vector() -> Vec3 {
         Vec3::inside_unit_sphere().normalized()
     }

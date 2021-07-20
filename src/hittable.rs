@@ -1,8 +1,8 @@
+use crate::material::MaterialPtr;
 use crate::maths::Ray;
 use crate::maths::Vec3;
-use crate::material::{MaterialPtr};
 
-pub type HittablePtr = Box<dyn Hittable>;
+pub type HittablePtr = std::sync::Arc<dyn Hittable>;
 pub struct HitRecord {
     pub point: Vec3,
     pub normal: Vec3,
@@ -12,7 +12,7 @@ pub struct HitRecord {
 }
 
 impl HitRecord {
-    fn create(ray: &Ray, t: f32, material:MaterialPtr, outward_normal: Vec3) -> HitRecord {
+    fn create(ray: &Ray, t: f32, material: MaterialPtr, outward_normal: Vec3) -> HitRecord {
         let point = ray.at(t);
         let front_face = Vec3::dot(ray.dir, outward_normal) < 0.0;
         let normal = match front_face {
@@ -28,10 +28,9 @@ impl HitRecord {
         }
     }
 }
-pub trait Hittable {
+pub trait Hittable: Send + Sync {
     fn hit(&self, tmin: f32, tmax: f32, ray: &Ray) -> Option<HitRecord>;
-}
-
+}   
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,
@@ -39,12 +38,12 @@ pub struct Sphere {
 }
 
 impl Sphere {
-    pub fn new(x: f32, y: f32, z: f32, radius: f32, material: MaterialPtr) -> Sphere {
-        Sphere {
+    pub fn create(x: f32, y: f32, z: f32, radius: f32, material: MaterialPtr) -> HittablePtr {
+        std::sync::Arc::new(Sphere {
             center: Vec3 { x, y, z },
             radius,
             material,
-        }
+        })
     }
 }
 
@@ -71,7 +70,12 @@ impl Hittable for Sphere {
         let point = ray.at(root);
         let outward_normal = (point - self.center) / self.radius;
 
-        Some(HitRecord::create(ray, root, self.material.clone(), outward_normal))
+        Some(HitRecord::create(
+            ray,
+            root,
+            self.material.clone(),
+            outward_normal,
+        ))
     }
 }
 
