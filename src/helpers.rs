@@ -31,6 +31,5 @@ pub fn ray_color<T: Hittable>(ray: Ray, world: &T, depth:i32) -> color::Color {
     let c0 = color::WHITE;
     let c1 = color::Color::new(0.5, 0.7, 1.0);
 
-    color::Color::lerp(c0, c1, t);
-    c1
+    color::Color::lerp(c0, c1, t)
 }

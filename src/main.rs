@@ -14,46 +14,69 @@ mod hittable;
 mod material;
 mod maths;
 
+
 fn main() {
     // Image
     let filename = std::ffi::CString::new("image.bmp").unwrap();
 
     let camera = camera::Camera::create();
 
-    let args: Vec<String> = std::env::args().collect();
-
-    let num_threads = if let Some(str) = args.get(1) {
-        str.parse::<i32>().expect("Invalid arguments")
-    } else {
-        1    
-    };
-
+    let mut num_threads = 1;
+    let mut samples_per_pixel = 10;
+    let mut width = 600;
+    let mut depth = 20;
     
-    let samples_per_pixel = 50;
-    let depth = 50;
-    let width = 1920;
+    for arg in std::env::args() {
+        let mut args = arg.split('=');
+        let command = args.next().expect("invalid args");
+
+        if let Some(value) = args.next() {
+            let value = value.parse::<i32>().expect("invalid number");
+            match &command[..] {
+                "-t" => {num_threads = value},
+                "-s" => {samples_per_pixel = value},
+                "-w" => {width = value},
+                "-d" => {depth = value},
+                _ => {}
+            }
+        }
+    }
+
     let height = (width as f32 / camera.aspect()) as i32;
 
     // World
     let mut world = HittableList::new();
     //let sphere = hittable::Sphere::new(0.0, 0.0, -1.0, 0.5);
-    let center_mat = material::Lambertian::create(Color {
-        r: 0.8,
-        g: 0.6,
-        b: 0.0,
+    let lambert_red = material::Lambertian::create(Color {
+        r: 0.93,
+        g: 0.4,
+        b: 0.1,
+    });
+    let lambert_blue = material::Lambertian::create(Color {
+        r: 0.03,
+        g: 0.34,
+        b: 0.93,
     });
     let aluminium = material::Metal::create(
         Color {
-            r: 0.6,
-            g: 0.6,
-            b: 0.6,
+            r: 0.8,
+            g: 0.8,
+            b: 0.8,
         },
         0.05,
     );
+    let gold = material::Metal::create(
+        Color {
+            r: 1.0,
+            g: 0.95,
+            b: 0.55,
+        },
+        0.11,
+    );
     let glass = material::Dieletric::create(
         Color {
-            r: 0.9,
-            g: 0.9,
+            r: 1.0,
+            g: 1.0,
             b: 1.0,
         },
         1.5,
@@ -63,16 +86,19 @@ fn main() {
         g: 0.8,
         b: 0.3,
     });
-    world.add(hittable::Sphere::create(-1.0, 0.0, -1.0, 0.35, aluminium));
+    world.add(hittable::Sphere::create(-1.0, 0.0, -1.0, 0.35, aluminium.clone()));
+    world.add(hittable::Sphere::create(1.5, 0.0, -2.0, 0.35, gold.clone()));
+    world.add(hittable::Sphere::create(1.8, 0.4, -2.0, 0.45, lambert_blue.clone()));
     world.add(hittable::Sphere::create(0.0, 0.0, -1.0, 0.5, glass.clone()));
+    world.add(hittable::Sphere::create(1.0, -0.3, -1.0, 0.2, glass.clone()));
     world.add(hittable::Sphere::create(
         0.0,
         0.0,
         -1.0,
-        -0.4,
+        -0.49,
         glass.clone(),
     ));
-    world.add(hittable::Sphere::create(0.0, 0.0, -3.0, 0.5, center_mat));
+    world.add(hittable::Sphere::create(0.0, 0.0, -3.0, 0.5, lambert_red));
     world.add(hittable::Sphere::create(
         0.0, -100.5, -3.0, 100.0, ground_mat,
     ));
@@ -136,6 +162,8 @@ fn main() {
     }
 
     println!("Used {} threads", num_threads);
+    println!("Used {}*{} Samples", samples_per_pixel, num_threads);
+    println!("Image size {}x{}", width, height);
     println!("Writing output to {:?}", filename);
     stb::image_write::stbi_write_bmp(&filename, width, height, 3, &image);
     println!("Done!");
