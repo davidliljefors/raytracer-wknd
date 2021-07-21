@@ -1,11 +1,12 @@
 #![allow(dead_code)]
-use core::{f32};
+use core::f32;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
 use crate::color::Color;
 use crate::helpers::{random_float, ray_color};
 use crate::hittable::HittableList;
+use crate::maths::Vec3;
 
 mod camera;
 mod color;
@@ -14,37 +15,7 @@ mod hittable;
 mod material;
 mod maths;
 
-
-fn main() {
-    // Image
-    let filename = std::ffi::CString::new("image.bmp").unwrap();
-
-    let camera = camera::Camera::create();
-
-    let mut num_threads = 1;
-    let mut samples_per_pixel = 10;
-    let mut width = 600;
-    let mut depth = 20;
-    
-    for arg in std::env::args() {
-        let mut args = arg.split('=');
-        let command = args.next().expect("invalid args");
-
-        if let Some(value) = args.next() {
-            let value = value.parse::<i32>().expect("invalid number");
-            match &command[..] {
-                "-t" => {num_threads = value},
-                "-s" => {samples_per_pixel = value},
-                "-w" => {width = value},
-                "-d" => {depth = value},
-                _ => {}
-            }
-        }
-    }
-
-    let height = (width as f32 / camera.aspect()) as i32;
-
-    // World
+fn make_world() -> HittableList {
     let mut world = HittableList::new();
     //let sphere = hittable::Sphere::new(0.0, 0.0, -1.0, 0.5);
     let lambert_red = material::Lambertian::create(Color {
@@ -86,11 +57,29 @@ fn main() {
         g: 0.8,
         b: 0.3,
     });
-    world.add(hittable::Sphere::create(-1.0, 0.0, -1.0, 0.35, aluminium.clone()));
+    world.add(hittable::Sphere::create(
+        -1.0,
+        0.0,
+        -1.0,
+        0.35,
+        aluminium.clone(),
+    ));
     world.add(hittable::Sphere::create(1.5, 0.0, -2.0, 0.35, gold.clone()));
-    world.add(hittable::Sphere::create(1.8, 0.4, -2.0, 0.45, lambert_blue.clone()));
+    world.add(hittable::Sphere::create(
+        1.8,
+        0.4,
+        -2.0,
+        0.45,
+        lambert_blue.clone(),
+    ));
     world.add(hittable::Sphere::create(0.0, 0.0, -1.0, 0.5, glass.clone()));
-    world.add(hittable::Sphere::create(1.0, -0.3, -1.0, 0.2, glass.clone()));
+    world.add(hittable::Sphere::create(
+        1.0,
+        -0.3,
+        -1.0,
+        0.2,
+        glass.clone(),
+    ));
     world.add(hittable::Sphere::create(
         0.0,
         0.0,
@@ -102,13 +91,62 @@ fn main() {
     world.add(hittable::Sphere::create(
         0.0, -100.5, -3.0, 100.0, ground_mat,
     ));
-    
-    let all_images = Arc::new( Mutex::new( Vec::<Color>::new() ) );
-    all_images.lock().unwrap().resize((width * height) as usize, color::BLACK);
-    
+
+    world
+}
+
+fn main() {
+    // Image
+    let filename = std::ffi::CString::new("image.bmp").unwrap();
+
+    let mut num_threads = 4;
+    let mut samples_per_pixel = 10;
+    let mut width = 1280;
+    let mut depth = 20;
+
+    for arg in std::env::args() {
+        let mut args = arg.split('=');
+        let command = args.next().expect("invalid args");
+
+        if let Some(value) = args.next() {
+            let value = value.parse::<i32>().expect("invalid number");
+            match &command[..] {
+                "-t" => num_threads = value,
+                "-s" => samples_per_pixel = value,
+                "-w" => width = value,
+                "-d" => depth = value,
+                _ => {}
+            }
+        }
+    }
+
+    let camera_pos = Vec3::new(3.0,1.0, 2.0);
+    let camera_focus = Vec3::new(1.5, -0.3, -1.5);
+    let focus_dist = (camera_pos-camera_focus).length();
+
+    let camera = camera::Camera::create(
+        camera_pos,
+        camera_focus,
+        Vec3::up(),
+        3.0 / 2.0,
+        30.0,
+        0.1,
+        focus_dist,
+    );  
+    let height = (width as f32 / camera.aspect()) as i32;
+
+    // World
+    let world = make_world();
+
+    let canvas = Arc::new(Mutex::new(Vec::<Color>::new()));
+    canvas
+        .lock()
+        .unwrap()
+        .resize((width * height) as usize, color::BLACK);
+
     let samples_per_thread = samples_per_pixel;
 
-    let thread_images = all_images.clone();
+    let thread_local_canvas = canvas.clone();
     let process_image = move || {
         let mut thread_result = Vec::<Color>::new();
         for y in (0..height).rev() {
@@ -130,31 +168,29 @@ fn main() {
                 thread_result.push(accum_color);
             }
         }
-        
-        let mut all = thread_images.lock().unwrap();
 
-        for (total, local) in all.iter_mut().zip(thread_result.iter()) {
-            *total += *local;
+        let mut thread_local_canvas = thread_local_canvas.lock().unwrap();
+
+        for (pixel, local) in thread_local_canvas.iter_mut().zip(thread_result.iter()) {
+            *pixel += *local;
         }
-        
     };
 
     let mut threads = Vec::new();
-    let process_image = std::sync::Arc::new( process_image );
+    let process_image = std::sync::Arc::new(process_image);
     for _ in 0..num_threads {
-
         let p1 = process_image.clone();
-        let t1 = std::thread::spawn( move || p1.deref()() );
-        threads.push( t1 );
+        let t1 = std::thread::spawn(move || p1.deref()());
+        threads.push(t1);
     }
 
     for t in threads {
         t.join().unwrap();
     }
-    
+
     let mut image = Vec::<u8>::new();
 
-    for color in all_images.lock().unwrap().iter() {
+    for color in canvas.lock().unwrap().iter() {
         let rgb8 = color.as_rgb8(samples_per_pixel * num_threads);
         image.push(rgb8.r);
         image.push(rgb8.g);

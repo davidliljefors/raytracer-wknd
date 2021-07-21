@@ -44,6 +44,18 @@ impl Vec3 {
         Vec3 { x, y, z }
     }
 
+    pub fn up() -> Vec3 {
+        Vec3::new(0.0, 1.0, 0.0)
+    }
+
+    pub fn right() -> Vec3 {
+        Vec3::new(1.0, 0.0, 0.0)
+    }
+
+    pub fn forward() -> Vec3 {
+        Vec3::new(0.0, 0.0, 1.0)
+    }
+
     pub fn from_scalar(scalar: f32) -> Vec3 {
         Vec3::new(scalar, scalar, scalar)
     }
@@ -63,6 +75,22 @@ impl Vec3 {
             let y = rng.gen_range(-1.0..1.0);
             let z = rng.gen_range(-1.0..1.0);
             Vec3{x,y,z}
+        };
+
+        loop {
+            let test = random_vector();
+            if test.length2() < 1.0 {
+                return test
+            }
+        }   
+    }
+
+    pub fn on_unit_disc() -> Vec3 {
+        let random_vector = || {
+            let mut rng = rand::thread_rng();
+            let x = rng.gen_range(-1.0..1.0);
+            let y = rng.gen_range(-1.0..1.0);
+            Vec3{x,y,z:0.0}
         };
 
         loop {
