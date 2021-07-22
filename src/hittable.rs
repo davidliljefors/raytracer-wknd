@@ -1,3 +1,4 @@
+use crate::aabb::Aabb;
 use crate::material::MaterialPtr;
 use crate::maths::Ray;
 use crate::maths::Vec3;
@@ -30,7 +31,9 @@ impl HitRecord {
 }
 pub trait Hittable: Send + Sync {
     fn hit(&self, tmin: f32, tmax: f32, ray: &Ray) -> Option<HitRecord>;
-}   
+
+    fn bounding_box(&self) -> Option<Aabb>;
+}
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,
@@ -77,6 +80,11 @@ impl Hittable for Sphere {
             outward_normal,
         ))
     }
+
+    fn bounding_box(&self) -> Option<Aabb> {
+        let radius3 = Vec3::from_scalar(self.radius);
+        Some(Aabb::new(self.center - radius3, self.center + radius3))
+    }
 }
 
 pub struct HittableList {
@@ -88,6 +96,10 @@ impl HittableList {
         HittableList {
             objects: Vec::<HittablePtr>::new(),
         }
+    }
+
+    pub fn objects(&self) -> &Vec<HittablePtr> {
+        &self.objects
     }
 
     pub fn add(&mut self, hittable: HittablePtr) {
@@ -106,5 +118,28 @@ impl Hittable for HittableList {
             }
         }
         temphit
+    }
+
+    fn bounding_box(&self) -> Option<Aabb> {
+        if self.objects.is_empty() {
+            return None;
+        }
+
+        let mut combined_bbox = Aabb::null_aabb();
+        let mut first_box = true;
+        for obj in self.objects.as_slice() {
+            if let Some(bbox) = obj.bounding_box() {
+                combined_bbox = if first_box {
+                    first_box = false;
+                    bbox
+                } else {
+                    Aabb::combine(combined_bbox, bbox)
+                };
+            } else {
+                return None;
+            }
+        }
+
+        Some(combined_bbox)
     }
 }

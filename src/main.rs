@@ -8,15 +8,19 @@ use crate::helpers::{random_float, ray_color};
 use crate::hittable::HittableList;
 use crate::maths::Vec3;
 
+type TsImage = Arc<Mutex<Vec<Color>>>;
+
 mod camera;
+mod aabb;
 mod color;
 mod helpers;
 mod hittable;
 mod material;
 mod maths;
+mod bvh;
 
-fn make_world() -> HittableList {
-    let mut world = HittableList::new();
+fn make_world() -> Arc<HittableList> {
+    let mut world =HittableList::new();
     //let sphere = hittable::Sphere::new(0.0, 0.0, -1.0, 0.5);
     let lambert_red = material::Lambertian::create(Color {
         r: 0.93,
@@ -92,7 +96,7 @@ fn make_world() -> HittableList {
         0.0, -100.5, -3.0, 100.0, ground_mat,
     ));
 
-    world
+    std::sync::Arc::new(world)
 }
 
 fn main() {
@@ -100,7 +104,7 @@ fn main() {
     let filename = std::ffi::CString::new("image.bmp").unwrap();
 
     let mut num_threads = 4;
-    let mut samples_per_pixel = 10;
+    let mut samples_per_pixel = 8;
     let mut width = 1280;
     let mut depth = 20;
 
@@ -121,14 +125,14 @@ fn main() {
     }
 
     let camera_pos = Vec3::new(3.0,1.0, 2.0);
-    let camera_focus = Vec3::new(1.5, -0.3, -1.5);
+    let camera_focus = Vec3::new(1.2, -0.3, -1.5);
     let focus_dist = (camera_pos-camera_focus).length();
 
     let camera = camera::Camera::create(
         camera_pos,
         camera_focus,
         Vec3::up(),
-        3.0 / 2.0,
+        16.0 / 9.0,
         30.0,
         0.1,
         focus_dist,
@@ -138,15 +142,15 @@ fn main() {
     // World
     let world = make_world();
 
-    let canvas = Arc::new(Mutex::new(Vec::<Color>::new()));
-    canvas
+    let image = Arc::new(Mutex::new(Vec::<Color>::new()));
+    image
         .lock()
         .unwrap()
         .resize((width * height) as usize, color::BLACK);
 
-    let samples_per_thread = samples_per_pixel;
+    let samples_per_thread = (samples_per_pixel as f32 / num_threads as f32).ceil() as i32;
 
-    let thread_local_canvas = canvas.clone();
+    let closure_image = image.clone();
     let process_image = move || {
         let mut thread_result = Vec::<Color>::new();
         for y in (0..height).rev() {
@@ -163,13 +167,13 @@ fn main() {
                     let rv = random_float(0.0..1.0);
                     let v = (y as f32 + rv) / (height as f32 - 1.0);
                     let u = (x as f32 + ru) / (width as f32 - 1.0);
-                    accum_color += ray_color(camera.get_ray(u, v), &world, depth);
+                    accum_color += ray_color(camera.get_ray(u, v), world.deref(), depth);
                 }
                 thread_result.push(accum_color);
             }
         }
 
-        let mut thread_local_canvas = thread_local_canvas.lock().unwrap();
+        let mut thread_local_canvas = closure_image.lock().unwrap();
 
         for (pixel, local) in thread_local_canvas.iter_mut().zip(thread_result.iter()) {
             *pixel += *local;
@@ -188,19 +192,19 @@ fn main() {
         t.join().unwrap();
     }
 
-    let mut image = Vec::<u8>::new();
+    let mut image_rgb8 = Vec::<u8>::new();
 
-    for color in canvas.lock().unwrap().iter() {
-        let rgb8 = color.as_rgb8(samples_per_pixel * num_threads);
-        image.push(rgb8.r);
-        image.push(rgb8.g);
-        image.push(rgb8.b);
+    for color in image.lock().unwrap().iter() {
+        let rgb8 = color.as_rgb8(samples_per_thread * num_threads);
+        image_rgb8.push(rgb8.r);
+        image_rgb8.push(rgb8.g);
+        image_rgb8.push(rgb8.b);
     }
 
     println!("Used {} threads", num_threads);
-    println!("Used {}*{} Samples", samples_per_pixel, num_threads);
+    println!("Used {}*{} Samples", samples_per_thread, num_threads);
     println!("Image size {}x{}", width, height);
     println!("Writing output to {:?}", filename);
-    stb::image_write::stbi_write_bmp(&filename, width, height, 3, &image);
+    stb::image_write::stbi_write_bmp(&filename, width, height, 3, &image_rgb8);
     println!("Done!");
 }

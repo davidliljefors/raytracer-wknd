@@ -161,6 +161,18 @@ impl Vec3 {
     }
 }
 
+impl Index<usize> for Vec3 {
+    type Output = f32;
+    fn index(&self, i: usize) -> &f32 {
+        match i {
+            0 => { &self.x },
+            1 => { &self.y },
+            2 => { &self.z },
+            _ => { panic!("Index out of bounds") }
+        }
+    }
+}
+
 impl Add for Vec3 {
     type Output = Vec3;
 
