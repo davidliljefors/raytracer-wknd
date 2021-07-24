@@ -5,6 +5,26 @@ use std::usize;
 use crate::aabb::Aabb;
 use crate::hittable::*;
 
+pub struct Bvh {
+    root: BvhNode
+}
+
+impl Bvh {
+    pub fn new(list: HittableList) -> Bvh {
+        Bvh{ root: BvhNode::new(list.objects(), 0, list.objects().len()) }
+    }
+}
+
+impl Hittable for Bvh {
+    fn hit(&self, tmin: f32, tmax: f32, ray: &crate::maths::Ray) -> Option<HitRecord> {
+        self.root.hit(tmin, tmax, ray)
+    }
+
+    fn bounding_box(&self) -> Option<Aabb> {
+        self.root.bounding_box()
+    }    
+}
+
 pub struct BvhNode {
     left: HittablePtr,
     right: HittablePtr,
@@ -20,11 +40,7 @@ fn compare_by_axis(a: &HittablePtr, b: &HittablePtr, axis: usize) -> Ordering {
 }
 
 impl BvhNode {
-    pub fn new(list: HittableList) -> BvhNode {
-        BvhNode::create_next(list.objects(), 0, list.objects().len())
-    }
-
-    fn create_next(src_objects: &[HittablePtr], start: usize, end: usize) -> BvhNode {
+    fn new(src_objects: &[HittablePtr], start: usize, end: usize) -> BvhNode {
         
         let mut objects = src_objects.to_vec();
         let axis = rand::thread_rng().gen_range(0..=2);
@@ -49,8 +65,8 @@ impl BvhNode {
             let range = &mut objects[start..end];
             range.sort_by(comparator);
             let mid = start + span / 2;
-            left = std::sync::Arc::new(BvhNode::create_next(src_objects, start, mid));
-            right = std::sync::Arc::new(BvhNode::create_next(src_objects, mid, end));
+            left = std::sync::Arc::new(BvhNode::new(src_objects, start, mid));
+            right = std::sync::Arc::new(BvhNode::new(src_objects, mid, end));
         }
 
         if let (Some(left_box), Some(right_box)) = (left.bounding_box(), right.bounding_box()) {

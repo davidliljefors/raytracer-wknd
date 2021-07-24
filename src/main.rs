@@ -7,6 +7,7 @@ use crate::color::Color;
 use crate::helpers::{random_float, ray_color};
 use crate::hittable::HittableList;
 use crate::maths::Vec3;
+use crate::bvh::Bvh;
 
 type TsImage = Arc<Mutex<Vec<Color>>>;
 
@@ -19,7 +20,7 @@ mod material;
 mod maths;
 mod bvh;
 
-fn make_world() -> Arc<HittableList> {
+fn make_world() -> Arc<Bvh> {
     let mut world =HittableList::new();
     //let sphere = hittable::Sphere::new(0.0, 0.0, -1.0, 0.5);
     let lambert_red = material::Lambertian::create(Color {
@@ -96,16 +97,16 @@ fn make_world() -> Arc<HittableList> {
         0.0, -100.5, -3.0, 100.0, ground_mat,
     ));
 
-    std::sync::Arc::new(world)
+    std::sync::Arc::new(Bvh::new(world))
 }
 
 fn main() {
     // Image
     let filename = std::ffi::CString::new("image.bmp").unwrap();
 
-    let mut num_threads = 4;
-    let mut samples_per_pixel = 8;
-    let mut width = 1280;
+    let mut num_threads = 6;
+    let mut samples_per_pixel = 60;
+    let mut width = 900;
     let mut depth = 20;
 
     for arg in std::env::args() {
@@ -124,8 +125,8 @@ fn main() {
         }
     }
 
-    let camera_pos = Vec3::new(3.0,1.0, 2.0);
-    let camera_focus = Vec3::new(1.2, -0.3, -1.5);
+    let camera_pos = Vec3::new(2.0,1.0, 1.0);
+    let camera_focus = Vec3::new(1., -0.3, -1.0);
     let focus_dist = (camera_pos-camera_focus).length();
 
     let camera = camera::Camera::create(
@@ -181,6 +182,7 @@ fn main() {
     };
 
     let mut threads = Vec::new();
+    let time_before_loop = std::time::Instant::now();
     let process_image = std::sync::Arc::new(process_image);
     for _ in 0..num_threads {
         let p1 = process_image.clone();
@@ -192,6 +194,7 @@ fn main() {
         t.join().unwrap();
     }
 
+    let loop_dur = std::time::Instant::now() - time_before_loop;
     let mut image_rgb8 = Vec::<u8>::new();
 
     for color in image.lock().unwrap().iter() {
@@ -200,7 +203,7 @@ fn main() {
         image_rgb8.push(rgb8.g);
         image_rgb8.push(rgb8.b);
     }
-
+    println!("Render took {} seconds", loop_dur.as_secs_f64());
     println!("Used {} threads", num_threads);
     println!("Used {}*{} Samples", samples_per_thread, num_threads);
     println!("Image size {}x{}", width, height);
