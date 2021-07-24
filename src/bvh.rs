@@ -1,6 +1,6 @@
+use rand::Rng;
 use std::cmp::Ordering;
 use std::usize;
-use rand::Rng;
 
 use crate::aabb::Aabb;
 use crate::hittable::*;
@@ -11,17 +11,13 @@ pub struct BvhNode {
     bounding_box: Aabb,
 }
 
-fn compare_x(a: &HittablePtr, b: &HittablePtr,) -> Ordering {
-    Ordering::Greater
+fn compare_by_axis(a: &HittablePtr, b: &HittablePtr, axis: usize) -> Ordering {
+    let left = a.bounding_box().expect("Bbox null in ctor");
+    let right = b.bounding_box().expect("Bbox null in ctor");
+    left.min[axis]
+        .partial_cmp(&right.min[axis])
+        .expect("Bbox error")
 }
-fn compare_y(a: &HittablePtr, b: &HittablePtr,) -> Ordering {
-    Ordering::Greater
-}
-fn compare_z(a: &HittablePtr, b: &HittablePtr,) -> Ordering {
-    Ordering::Greater
-}
-
-const NUMBERS: [fn(&HittablePtr, &HittablePtr)->Ordering;3] = [compare_x, compare_y, compare_z];
 
 impl BvhNode {
     pub fn new(list: HittableList) -> BvhNode {
@@ -29,24 +25,24 @@ impl BvhNode {
     }
 
     fn create_next(src_objects: &[HittablePtr], start: usize, end: usize) -> BvhNode {
-        let mut rng = rand::thread_rng();
-        let mut objects = src_objects.to_vec();
-        let comparator = NUMBERS[rng.gen_range(0..=2)];
-        let span = end - start;
         
+        let mut objects = src_objects.to_vec();
+        let axis = rand::thread_rng().gen_range(0..=2);
+        let comparator = move |a:&HittablePtr, b:&HittablePtr| compare_by_axis(a, b, axis);
+        let span = end - start;
+
         let left;
         let right;
 
         if span == 1 {
             left = objects[start].clone();
             right = objects[start].clone();
-        }
-        else if span == 2 {
-            if comparator(&objects[start], &objects[start+1]) == Ordering::Less {
+        } else if span == 2 {
+            if comparator(&objects[start], &objects[start + 1]) == Ordering::Less {
                 left = objects[start].clone();
-                right = objects[start+1].clone();
+                right = objects[start + 1].clone();
             } else {
-                left = objects[start+1].clone();
+                left = objects[start + 1].clone();
                 right = objects[start].clone();
             }
         } else {
@@ -57,7 +53,16 @@ impl BvhNode {
             right = std::sync::Arc::new(BvhNode::create_next(src_objects, mid, end));
         }
 
-        BvhNode{left, right, bounding_box:Aabb::null_aabb() }
+        if let (Some(left_box), Some(right_box)) = (left.bounding_box(), right.bounding_box()) {
+            let bounding_box = Aabb::combine(left_box, right_box);
+            return BvhNode {
+                left,
+                right,
+                bounding_box,
+            };
+        }
+
+        panic!("No bounding box in bvh ctor");
     }
 }
 
