@@ -3,35 +3,40 @@ use core::f32;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
+use crate::bvh::Bvh;
 use crate::color::Color;
-use crate::helpers::{random_float, ray_color};
+use crate::helpers::*;
 use crate::hittable::HittableList;
 use crate::maths::Vec3;
-use crate::bvh::Bvh;
 
 type TsImage = Arc<Mutex<Vec<Color>>>;
 
-mod camera;
 mod aabb;
+mod bvh;
+mod camera;
 mod color;
 mod helpers;
 mod hittable;
 mod material;
 mod maths;
-mod bvh;
 
 fn make_world() -> Arc<Bvh> {
-    let mut world =HittableList::new();
+    let mut world = HittableList::new();
     //let sphere = hittable::Sphere::new(0.0, 0.0, -1.0, 0.5);
     let lambert_red = material::Lambertian::create(Color {
         r: 0.93,
-        g: 0.4,
-        b: 0.1,
+        g: 0.0,
+        b: 0.0,
     });
-    let lambert_blue = material::Lambertian::create(Color {
-        r: 0.03,
-        g: 0.34,
-        b: 0.93,
+    let sun = material::DiffuseLight::create(Color {
+        r: 1.00,
+        g: 1.00,
+        b: 0.90,
+    });
+    let lamp = material::DiffuseLight::create(Color {
+        r: 1.00,
+        g: 1.00,
+        b: 0.0,
     });
     let aluminium = material::Metal::create(
         Color {
@@ -69,13 +74,20 @@ fn make_world() -> Arc<Bvh> {
         0.35,
         aluminium.clone(),
     ));
+    world.add(hittable::Sphere::create(
+        2.0,
+        2.0,
+        -2.0,
+        0.5,
+        lamp
+    ));
     world.add(hittable::Sphere::create(1.5, 0.0, -2.0, 0.35, gold.clone()));
     world.add(hittable::Sphere::create(
-        1.8,
-        0.4,
-        -2.0,
-        0.45,
-        lambert_blue.clone(),
+        -80.0,
+        60.0,
+        -50.0,
+        70.0,
+        sun.clone(),
     ));
     world.add(hittable::Sphere::create(0.0, 0.0, -1.0, 0.5, glass.clone()));
     world.add(hittable::Sphere::create(
@@ -83,13 +95,6 @@ fn make_world() -> Arc<Bvh> {
         -0.3,
         -1.0,
         0.2,
-        glass.clone(),
-    ));
-    world.add(hittable::Sphere::create(
-        0.0,
-        0.0,
-        -1.0,
-        -0.49,
         glass.clone(),
     ));
     world.add(hittable::Sphere::create(0.0, 0.0, -3.0, 0.5, lambert_red));
@@ -100,14 +105,47 @@ fn make_world() -> Arc<Bvh> {
     std::sync::Arc::new(Bvh::new(world))
 }
 
+fn collect_normals<T: hittable::Hittable>(
+    world: &T,
+    camera: camera::Camera,
+    width: i32,
+    height: i32,
+) -> Vec<Color> {
+    let mut normals = Vec::<Color>::new();
+    for y in 0..height {
+        for x in 0..width {
+            let u = x as f32 / (width as f32 - 1.0);
+            let v = y as f32 / (height as f32 - 1.0);
+            normals.push(hit_normal(camera.straight_ray(u, v), world.deref()));
+        }
+    }
+    normals
+}
+
+fn collect_albedo<T: hittable::Hittable>(
+    world: &T,
+    camera: camera::Camera,
+    width: i32,
+    height: i32,
+) -> Vec<Color> {
+    let mut normals = Vec::<Color>::new();
+    for y in 0..height {
+        for x in 0..width {
+            let u = x as f32 / (width as f32 - 1.0);
+            let v = y as f32 / (height as f32 - 1.0);
+            normals.push(hit_albedo(camera.straight_ray(u, v), world.deref()));
+        }
+    }
+    normals
+}
+
 fn main() {
     // Image
-    let filename = std::ffi::CString::new("image.bmp").unwrap();
-
-    let mut num_threads = 12;
-    let mut samples_per_pixel = 100;
-    let mut width = 1600;
-    let mut depth = 20;
+    const bg : color::Color = color::Color{r:0.0001, g:0.0002, b:0.002};
+    let mut num_threads = 10;
+    let mut samples_per_pixel = 400;
+    let mut width = 2000;
+    let mut depth = 100;
 
     for arg in std::env::args() {
         let mut args = arg.split('=');
@@ -125,9 +163,11 @@ fn main() {
         }
     }
 
-    let camera_pos = Vec3::new(2.0,1.0, 1.0);
+    let world = make_world();
+
+    let camera_pos = Vec3::new(5.0, 2.5, 3.0);
     let camera_focus = Vec3::new(1., -0.3, -1.0);
-    let focus_dist = (camera_pos-camera_focus).length();
+    let focus_dist = (camera_pos - camera_focus).length();
 
     let camera = camera::Camera::create(
         camera_pos,
@@ -135,13 +175,11 @@ fn main() {
         Vec3::up(),
         16.0 / 9.0,
         30.0,
-        0.1,
+        0.0,
         focus_dist,
-    );  
+    );
     let height = (width as f32 / camera.aspect()) as i32;
-
     // World
-    let world = make_world();
 
     let image = Arc::new(Mutex::new(Vec::<Color>::new()));
     image
@@ -150,9 +188,9 @@ fn main() {
         .resize((width * height) as usize, color::BLACK);
 
     let closure_image = image.clone();
-    let process_image = move |begin, end| {
-        let mut thread_result =  Vec::<Color>::new();
-
+    let process_image = move |begin, end, world: Arc<Bvh>| {
+        let mut thread_result = Vec::<Color>::new();
+        let scale = 1.0 / samples_per_pixel as f32;
         for y in begin..end {
             for x in 0..width {
                 let mut accum_color = color::BLACK;
@@ -161,37 +199,39 @@ fn main() {
                     let rv = random_float(0.0..1.0);
                     let v = (y as f32 + rv) / (height as f32 - 1.0);
                     let u = (x as f32 + ru) / (width as f32 - 1.0);
-                    accum_color += ray_color(camera.get_ray(u, v), world.deref(), depth);
+                    accum_color += ray_color(camera.get_ray(u, v), world.deref(), bg, depth);
                 }
-                thread_result.push(accum_color);
+                thread_result.push(accum_color * scale);
             }
         }
 
         let mut thread_local_canvas = closure_image.lock().unwrap();
         let offset = begin * width;
         for (index, color) in thread_result.iter().enumerate() {
-            thread_local_canvas[index+offset as usize] += *color;
+            thread_local_canvas[index + offset as usize] += *color;
         }
     };
 
     let mut threads = Vec::new();
     let time_before_loop = std::time::Instant::now();
     let process_image = std::sync::Arc::new(process_image);
-    
+
     let subrange_step = height / num_threads;
     let remainder = height % num_threads;
-    assert!( subrange_step > 0, "dont use more threads than image height :(" );
+    assert!(
+        subrange_step > 0,
+        "dont use more threads than image height :("
+    );
 
     for thread_num in 0..num_threads {
         let range_start = thread_num * subrange_step;
-        let mut range_end = (thread_num+1) * subrange_step;
-        if thread_num == num_threads-1 
-        {
+        let mut range_end = (thread_num + 1) * subrange_step;
+        if thread_num == num_threads - 1 {
             range_end += remainder;
         }
+        let w = world.clone();
         let p1 = process_image.clone();
-        let t1 = std::thread::spawn(move || p1.deref()
-        (range_start, range_end) );
+        let t1 = std::thread::spawn(move || p1.deref()(range_start, range_end, w));
         threads.push(t1);
     }
 
@@ -200,19 +240,15 @@ fn main() {
     }
 
     let loop_dur = std::time::Instant::now() - time_before_loop;
-    let mut image_rgb8 = Vec::<u8>::new();
+    let normal_data = collect_normals(world.deref(), camera, width, height);
+    let albedo_data = collect_albedo(world.deref(), camera, width, height);
+    write_image_flipped("beauty.png", &image.lock().unwrap(), width, height);
+    write_image_flipped("normal.png", &normal_data, width, height);
+    write_image_flipped("albedo.png", &albedo_data, width, height);
 
-    for color in image.lock().unwrap().iter() {
-        let rgb8 = color.as_rgb8( samples_per_pixel );
-        image_rgb8.push(rgb8.r);
-        image_rgb8.push(rgb8.g);
-        image_rgb8.push(rgb8.b);
-    }
     println!("Render took {} seconds", loop_dur.as_secs_f64());
     println!("Used {} threads", num_threads);
-    println!("Used {} Samples", samples_per_pixel );
+    println!("Used {} Samples", samples_per_pixel);
     println!("Image size {}x{}", width, height);
-    println!("Writing output to {:?}", filename);
-    stb::image_write::stbi_write_bmp(&filename, width, height, 3, &image_rgb8);
     println!("Done!");
 }

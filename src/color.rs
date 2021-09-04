@@ -25,14 +25,10 @@ impl Color {
         Color{r, g, b}
     }
 
-    pub fn as_rgb8(self: Color, samples_per_pixel:i32 ) -> RGB8 {
-        let scale = 1.0 / samples_per_pixel as f32;
-
-        let scaled = self * scale;
-        
-        let r = (256.0 * clamp(0.0, 0.9999, scaled.r).sqrt()) as u8;
-        let g = (256.0 * clamp(0.0, 0.9999, scaled.g).sqrt()) as u8;
-        let b = (256.0 * clamp(0.0, 0.9999, scaled.b).sqrt()) as u8;
+    pub fn as_rgb8(self: Color ) -> RGB8 {
+        let r = (256.0 * clamp(0.0, 0.9999, self.r).sqrt()) as u8;
+        let g = (256.0 * clamp(0.0, 0.9999, self.g).sqrt()) as u8;
+        let b = (256.0 * clamp(0.0, 0.9999, self.b).sqrt()) as u8;
         RGB8 { r, g, b }
     }
 

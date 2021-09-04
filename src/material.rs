@@ -1,4 +1,4 @@
-use crate::color::Color;
+use crate::color::{self, Color};
 use crate::helpers::random_float;
 use crate::hittable::HitRecord;
 use crate::maths::{Ray, Vec3};
@@ -6,7 +6,11 @@ use crate::maths::{Ray, Vec3};
 pub type MaterialPtr = std::sync::Arc<dyn Material>;
 
 pub trait Material: Sync + Send {
-    fn scatter(&self, ray: Ray, hit: HitRecord) -> Option<(Color, Ray)>;
+    fn scatter(&self, ray: Ray, hit: &HitRecord) -> Option<(Color, Ray)>;
+    fn emitted(&self) -> Color {
+        color::BLACK
+    }
+    fn albedo(&self) -> Color;
 }
 
 pub struct Lambertian {
@@ -20,7 +24,7 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, _: Ray, hit: HitRecord) -> Option<(Color, Ray)> {
+    fn scatter(&self, _: Ray, hit: &HitRecord) -> Option<(Color, Ray)> {
         let mut scatter_direction = hit.normal + Vec3::random_unit_vector();
         if scatter_direction.length2() < f32::EPSILON {
             scatter_direction = hit.normal;
@@ -28,6 +32,10 @@ impl Material for Lambertian {
 
         let scattered = Ray::new(hit.point, scatter_direction);
         Some((self.albedo, scattered))
+    }
+
+    fn albedo(&self) -> Color {
+        self.albedo
     }
 }
 
@@ -48,7 +56,7 @@ impl Metal {
 }
 
 impl Material for Metal {
-    fn scatter(&self, ray: Ray, hit: HitRecord) -> Option<(Color, Ray)> {
+    fn scatter(&self, ray: Ray, hit: &HitRecord) -> Option<(Color, Ray)> {
         let reflected = Vec3::reflect(ray.dir.normalized(), hit.normal);
 
         let scattered = Ray::new(
@@ -60,6 +68,10 @@ impl Material for Metal {
         }
 
         None
+    }
+
+    fn albedo(&self) -> Color {
+        self.albedo
     }
 }
 
@@ -85,7 +97,7 @@ impl Dieletric {
 }
 
 impl Material for Dieletric {
-    fn scatter(&self, ray: Ray, hit: HitRecord) -> Option<(Color, Ray)> {
+    fn scatter(&self, ray: Ray, hit: &HitRecord) -> Option<(Color, Ray)> {
         let refraction_ratio = if hit.front_face {
             1.0 / self.index_of_refraction
         } else {
@@ -108,5 +120,33 @@ impl Material for Dieletric {
         let scattered = Ray::new(hit.point, direction);
 
         Some((self.albedo, scattered))
+    }
+
+    fn albedo(&self) -> Color {
+        self.albedo
+    }
+}
+
+pub struct DiffuseLight {
+    emission:Color
+} 
+
+impl DiffuseLight {
+    pub fn create(emission: Color) -> MaterialPtr {
+        std::sync::Arc::new(DiffuseLight { emission })
+    }
+}
+
+impl Material for DiffuseLight {
+    fn scatter(&self, _: Ray, _: &HitRecord) -> Option<(Color, Ray)> {
+        None
+    }
+
+    fn emitted(&self) -> Color {
+        self.emission
+    }
+
+    fn albedo(&self) -> Color {
+        self.emission
     }
 }

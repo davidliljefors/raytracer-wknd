@@ -1,6 +1,7 @@
 use crate::maths::Ray;
 use crate::maths::Vec3;
 
+#[derive(Clone, Copy)]
 pub struct Camera {
     origin: Vec3,
     lower_left_corner: Vec3,
@@ -59,6 +60,13 @@ impl Camera {
         Ray::new(
             self.origin + offset,
             self.lower_left_corner + self.horizontal * s + self.vertical * t - self.origin - offset,
+        )
+    }
+
+    pub fn straight_ray(&self, s: f32, t: f32) -> Ray {
+        Ray::new(
+            self.origin,
+            self.lower_left_corner + self.horizontal * s + self.vertical * t - self.origin,
         )
     }
 }
